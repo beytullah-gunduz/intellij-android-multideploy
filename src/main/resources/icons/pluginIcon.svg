@@ -1,0 +1,12 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Left device -->
+  <rect x="3" y="4" width="14" height="24" rx="2" stroke="#6E6E6E" stroke-width="1.5" fill="none"/>
+  <line x1="7" y1="24" x2="13" y2="24" stroke="#6E6E6E" stroke-width="1"/>
+  <rect x="5" y="7" width="10" height="14" rx="0.5" fill="#6E6E6E" opacity="0.15"/>
+  <!-- Right device (offset) -->
+  <rect x="15" y="10" width="14" height="24" rx="2" stroke="#6E6E6E" stroke-width="1.5" fill="none"/>
+  <line x1="19" y1="30" x2="25" y2="30" stroke="#6E6E6E" stroke-width="1"/>
+  <rect x="17" y="13" width="10" height="14" rx="0.5" fill="#6E6E6E" opacity="0.15"/>
+  <!-- Deploy arrow -->
+  <polygon points="31,15 31,27 39,21" fill="#389FD6"/>
+</svg>

@@ -13,7 +13,7 @@
         <toolWindow id="Android MultiDeploy"
                     anchor="right"
                     factoryClass="com.androidmultideploy.MultiDeployToolWindowFactory"
-                    icon="AllIcons.Actions.Execute"/>
+                    icon="/icons/toolWindow.svg"/>
         <notificationGroup id="Android MultiDeploy"
                            displayType="BALLOON"/>
         <projectService
