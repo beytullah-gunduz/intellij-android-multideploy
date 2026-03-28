@@ -1,0 +1,22 @@
+<idea-plugin>
+    <id>com.androidmultideploy</id>
+    <name>Android MultiDeploy</name>
+    <vendor>Android MultiDeploy</vendor>
+    <description><![CDATA[
+    Deploy multiple modules to different devices simultaneously.
+    Add deployment tasks with device and module selection, then launch them all with one click.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="Android MultiDeploy"
+                    anchor="right"
+                    factoryClass="com.androidmultideploy.MultiDeployToolWindowFactory"
+                    icon="AllIcons.Actions.Execute"/>
+        <notificationGroup id="Android MultiDeploy"
+                           displayType="BALLOON"/>
+        <projectService
+            serviceImplementation="com.androidmultideploy.MultiDeployConfigState"/>
+    </extensions>
+</idea-plugin>
