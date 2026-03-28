@@ -13,7 +13,6 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.wm.ToolWindow
-import com.intellij.ui.AnimatedIcon
 import com.intellij.ui.components.JBScrollPane
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -34,9 +33,7 @@ class MultiDeployPanel(
     private val taskRows = mutableListOf<TaskRowPanel>()
     private var deviceResult: DeviceResult = DeviceResult.Error("Not initialized")
     private val runner = DeployRunner(project)
-    private val spinnerIcon = AnimatedIcon.Default()
     private val actionToolbar: ActionToolbar
-    private val animationTimer: Timer
     private val healthCheckTimer: Timer
     private val configState = MultiDeployConfigState.getInstance(project)
     private val configComboModel = DefaultComboBoxModel<String>()
@@ -72,8 +69,6 @@ class MultiDeployPanel(
         }
         add(topBar, BorderLayout.NORTH)
 
-        animationTimer = Timer(125) { actionToolbar.component.repaint() }
-
         val wrapper = JPanel(BorderLayout())
         wrapper.add(tasksPanel, BorderLayout.NORTH)
         add(JBScrollPane(wrapper), BorderLayout.CENTER)
@@ -106,23 +101,14 @@ class MultiDeployPanel(
         saveCurrentTasksToActiveConfig()
         val task = row.getDeployTask()
         row.setRunning()
-        if (!animationTimer.isRunning) animationTimer.start()
         runner.runTask(task, row, toolWindow) { isError ->
             if (isError) row.setError() else row.setIdle()
-            if (!runner.isRunning()) {
-                animationTimer.stop()
-                actionToolbar.updateActionsAsync()
-            }
         }
     }
 
     private fun stopSingleTask(row: TaskRowPanel) {
         runner.stopTask(row)
         row.setIdle()
-        if (!runner.isRunning()) {
-            animationTimer.stop()
-            actionToolbar.updateActionsAsync()
-        }
     }
 
     // --- Device health ---
@@ -265,16 +251,11 @@ class MultiDeployPanel(
             runner.runAll(tasks, keys, toolWindow,
                 onTaskStarted = { index ->
                     if (index < taskRows.size) taskRows[index].setRunning()
-                    if (!animationTimer.isRunning) animationTimer.start()
                 },
                 onTaskFinished = { index, isError ->
                     if (index < taskRows.size) {
                         if (isError) taskRows[index].setError()
                         else taskRows[index].setIdle()
-                    }
-                    if (!runner.isRunning()) {
-                        animationTimer.stop()
-                        actionToolbar.updateActionsAsync()
                     }
                 }
             )
@@ -283,7 +264,6 @@ class MultiDeployPanel(
         override fun update(e: AnActionEvent) {
             val running = runner.isRunning()
             e.presentation.isEnabled = taskRows.isNotEmpty() && !running
-            e.presentation.icon = if (running) spinnerIcon else AllIcons.Actions.Execute
         }
 
         override fun getActionUpdateThread() = ActionUpdateThread.EDT
@@ -295,8 +275,6 @@ class MultiDeployPanel(
         override fun actionPerformed(e: AnActionEvent) {
             runner.stopAll()
             taskRows.forEach { it.setIdle() }
-            animationTimer.stop()
-            actionToolbar.updateActionsAsync()
         }
 
         override fun update(e: AnActionEvent) {
