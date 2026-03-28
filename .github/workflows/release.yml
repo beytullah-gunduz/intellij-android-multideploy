@@ -61,6 +61,12 @@ jobs:
           git tag "v${{ steps.version.outputs.new_version }}"
           git push origin main --tags
 
+      - name: Set version from tag
+        if: github.event_name == 'push'
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          sed -i "s/version = \".*\"/version = \"$TAG_VERSION\"/" build.gradle.kts
+
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
