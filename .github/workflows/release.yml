@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version bump type or explicit version (e.g. patch, minor, major, or 1.2.3)'
+        required: true
+        default: 'patch'
+        type: string
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        if: github.event_name == 'workflow_dispatch'
+        id: version
+        run: |
+          CURRENT=$(grep -oP 'version\s*=\s*"\K[^"]+' build.gradle.kts)
+          echo "Current version: $CURRENT"
+
+          INPUT="${{ github.event.inputs.version }}"
+
+          if [[ "$INPUT" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            NEW_VERSION="$INPUT"
+          else
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+            case "$INPUT" in
+              major) NEW_VERSION="$((MAJOR + 1)).0.0" ;;
+              minor) NEW_VERSION="$MAJOR.$((MINOR + 1)).0" ;;
+              patch) NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))" ;;
+              *) echo "Invalid input: $INPUT (use patch, minor, major, or x.y.z)" && exit 1 ;;
+            esac
+          fi
+
+          echo "New version: $NEW_VERSION"
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Update version in build.gradle.kts
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          sed -i "s/version = \".*\"/version = \"${{ steps.version.outputs.new_version }}\"/" build.gradle.kts
+
+      - name: Commit and tag
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add build.gradle.kts
+          git commit -m "Release v${{ steps.version.outputs.new_version }}"
+          git tag "v${{ steps.version.outputs.new_version }}"
+          git push origin main --tags
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build plugin
+        run: ./gradlew buildPlugin
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', steps.version.outputs.new_version) || github.ref_name }}
+          files: build/distributions/*.zip
+          generate_release_notes: true
