@@ -25,6 +25,9 @@ kotlin {
 }
 
 tasks {
+    instrumentCode {
+        enabled = false
+    }
     patchPluginXml {
         sinceBuild.set("243")
         untilBuild.set("263.*")
