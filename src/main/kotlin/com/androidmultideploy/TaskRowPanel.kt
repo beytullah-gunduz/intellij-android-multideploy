@@ -32,6 +32,10 @@ class TaskRowPanel(
     private var runState = RunState.IDLE
     private var isDeviceAvailable = true
 
+    // Maps between serial numbers and display names (e.g. "Pixel 7 (emulator-5554)")
+    private var serialToDisplay = mutableMapOf<String, String>()
+    private var displayToSerial = mutableMapOf<String, String>()
+
     private val progressBar = JProgressBar().apply {
         isIndeterminate = true
         preferredSize = Dimension(0, 3)
@@ -149,12 +153,10 @@ class TaskRowPanel(
             anchor = GridBagConstraints.WEST
         }
 
-        // Device label
         gbc.gridx = 0; gbc.gridy = 0; gbc.weightx = 0.0
         gbc.fill = GridBagConstraints.NONE
         contentPanel.add(JBLabel("Device:"), gbc)
 
-        // Device combo + error/warning labels stacked vertically
         val devicePanel = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             isOpaque = false
@@ -166,7 +168,6 @@ class TaskRowPanel(
         gbc.fill = GridBagConstraints.HORIZONTAL
         contentPanel.add(devicePanel, gbc)
 
-        // Module
         gbc.gridx = 0; gbc.gridy = 1; gbc.weightx = 0.0
         gbc.fill = GridBagConstraints.NONE
         contentPanel.add(JBLabel("Module:"), gbc)
@@ -174,7 +175,6 @@ class TaskRowPanel(
         gbc.fill = GridBagConstraints.HORIZONTAL
         contentPanel.add(moduleCombo, gbc)
 
-        // Gradle task
         gbc.gridx = 0; gbc.gridy = 2; gbc.weightx = 0.0
         gbc.fill = GridBagConstraints.NONE
         contentPanel.add(JBLabel("Task:"), gbc)
@@ -182,7 +182,6 @@ class TaskRowPanel(
         gbc.fill = GridBagConstraints.HORIZONTAL
         contentPanel.add(gradleTaskField, gbc)
 
-        // Status panel (actions / stop / retry)
         gbc.gridx = 2; gbc.gridy = 0; gbc.gridheight = 3
         gbc.weightx = 0.0; gbc.fill = GridBagConstraints.NONE
         gbc.anchor = GridBagConstraints.NORTH
@@ -262,11 +261,29 @@ class TaskRowPanel(
         removeBtn.isEnabled = enabled
     }
 
+    // --- Device display name mapping ---
+
+    private fun buildDisplayName(serial: String, model: String?): String {
+        return if (model != null) "$model ($serial)" else serial
+    }
+
+    private fun getSelectedSerial(): String? {
+        val display = deviceCombo.selectedItem?.toString() ?: return null
+        return displayToSerial[display] ?: display
+    }
+
     private fun applyDeviceResult(result: DeviceResult) {
         deviceCombo.removeAllItems()
+        serialToDisplay.clear()
+        displayToSerial.clear()
         when (result) {
             is DeviceResult.Success -> {
-                result.devices.forEach { deviceCombo.addItem(it) }
+                result.devices.forEach { serial ->
+                    val display = buildDisplayName(serial, result.deviceNames[serial])
+                    serialToDisplay[serial] = display
+                    displayToSerial[display] = serial
+                    deviceCombo.addItem(display)
+                }
                 deviceCombo.putClientProperty("JComponent.outline", null)
                 deviceErrorLabel.isVisible = false
             }
@@ -287,29 +304,37 @@ class TaskRowPanel(
     }
 
     fun updateDevices(result: DeviceResult) {
-        val current = deviceCombo.selectedItem?.toString()
+        val currentSerial = getSelectedSerial()
         applyDeviceResult(result)
-        if (!current.isNullOrEmpty()) {
-            ensureDeviceInModel(current)
-            deviceCombo.selectedItem = current
+        if (!currentSerial.isNullOrEmpty()) {
+            val display = serialToDisplay[currentSerial] ?: currentSerial
+            ensureDeviceInCombo(display)
+            deviceCombo.selectedItem = display
         }
     }
 
-    fun getDeployTask() = DeployTask(
-        device = deviceCombo.selectedItem?.toString() ?: "",
-        module = moduleCombo.selectedItem?.toString() ?: "",
-        gradleTask = gradleTaskField.text
-    )
+    fun getDeployTask(): DeployTask {
+        val display = deviceCombo.selectedItem?.toString() ?: ""
+        val serial = displayToSerial[display] ?: display
+        return DeployTask(
+            device = serial,
+            module = moduleCombo.selectedItem?.toString() ?: "",
+            gradleTask = gradleTaskField.text,
+            deviceDisplayName = display
+        )
+    }
 
-    fun selectDevice(device: String) {
-        ensureDeviceInModel(device)
-        deviceCombo.selectedItem = device
+    fun selectDevice(serial: String) {
+        val display = serialToDisplay[serial] ?: serial
+        ensureDeviceInCombo(display)
+        deviceCombo.selectedItem = display
     }
 
     fun restoreFrom(task: DeployTask) {
         if (task.device.isNotEmpty()) {
-            ensureDeviceInModel(task.device)
-            deviceCombo.selectedItem = task.device
+            val display = serialToDisplay[task.device] ?: task.device
+            ensureDeviceInCombo(display)
+            deviceCombo.selectedItem = display
         }
         for (i in 0 until moduleCombo.itemCount) {
             if (moduleCombo.getItemAt(i) == task.module) {
@@ -320,11 +345,11 @@ class TaskRowPanel(
         gradleTaskField.text = task.gradleTask
     }
 
-    private fun ensureDeviceInModel(device: String) {
+    private fun ensureDeviceInCombo(display: String) {
         for (i in 0 until deviceCombo.itemCount) {
-            if (deviceCombo.getItemAt(i) == device) return
+            if (deviceCombo.getItemAt(i) == display) return
         }
-        deviceCombo.addItem(device)
+        deviceCombo.addItem(display)
     }
 
     companion object {

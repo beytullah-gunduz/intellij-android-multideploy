@@ -48,8 +48,6 @@ class MultiDeployPanel(
     private var isUpdatingCombo = false
 
     init {
-        refreshDevices()
-
         val actionGroup = DefaultActionGroup().apply {
             add(RunAllAction())
             add(StopAllAction())
@@ -78,12 +76,12 @@ class MultiDeployPanel(
         wrapper.add(tasksPanel, BorderLayout.NORTH)
         add(JBScrollPane(wrapper), BorderLayout.CENTER)
 
-        // Load saved configurations
+        // Load saved configurations (rows start with empty device combos)
         refreshConfigCombo()
         restoreActiveConfig()
 
-        // Initial device health check
-        updateDeviceHealth(deviceResult)
+        // Load devices asynchronously — updates all rows when done
+        refreshDevicesAsync()
 
         // Periodic device health check every 10s
         healthCheckTimer = Timer(10_000) {
@@ -125,26 +123,47 @@ class MultiDeployPanel(
         }
     }
 
-    // --- Device health ---
+    // --- Device loading (always off EDT) ---
 
-    private fun checkDeviceHealth() {
+    private fun refreshDevicesAsync() {
         ApplicationManager.getApplication().executeOnPooledThread {
             val result = AdbHelper.getDevices()
             ApplicationManager.getApplication().invokeLater {
                 deviceResult = result
+                taskRows.forEach { it.updateDevices(result) }
                 updateDeviceHealth(result)
             }
         }
     }
 
+    /**
+     * Lightweight check — only runs `adb devices` (no model queries).
+     * Fast enough for periodic 10s polling.
+     */
+    private fun checkDeviceHealth() {
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val connected = AdbHelper.getConnectedSerials()
+            ApplicationManager.getApplication().invokeLater {
+                for (row in taskRows) {
+                    val serial = row.getDeployTask().device
+                    if (serial.isNotEmpty() && serial !in connected) {
+                        row.setDeviceUnavailable("Device disconnected")
+                    } else {
+                        row.setDeviceAvailable()
+                    }
+                }
+            }
+        }
+    }
+
     private fun updateDeviceHealth(result: DeviceResult) {
-        val connectedDevices = when (result) {
+        val connectedSerials = when (result) {
             is DeviceResult.Success -> result.devices.toSet()
             is DeviceResult.Error -> emptySet()
         }
         for (row in taskRows) {
-            val device = row.getDeployTask().device
-            if (device.isNotEmpty() && device !in connectedDevices) {
+            val serial = row.getDeployTask().device
+            if (serial.isNotEmpty() && serial !in connectedSerials) {
                 row.setDeviceUnavailable("Device disconnected")
             } else {
                 row.setDeviceAvailable()
@@ -196,7 +215,7 @@ class MultiDeployPanel(
         return TaskRowPanel(
             deviceResult, modules,
             onRemove = { removeTask(it) },
-            onRetryDeviceCheck = { checkDeviceHealth() },
+            onRetryDeviceCheck = { refreshDevicesAsync() },
             onRun = { runSingleTask(it) },
             onStop = { stopSingleTask(it) }
         )
@@ -221,15 +240,10 @@ class MultiDeployPanel(
             .sorted()
     }
 
-    private fun refreshDevices() {
-        deviceResult = AdbHelper.getDevices()
-    }
-
     private fun addTask() {
         val modules = getModules()
         val row = createRow(modules)
 
-        // Pick a device not already used by existing rows
         if (deviceResult is DeviceResult.Success) {
             val usedDevices = taskRows.map { it.getDeployTask().device }.toSet()
             val available = (deviceResult as DeviceResult.Success).devices
@@ -324,9 +338,7 @@ class MultiDeployPanel(
         "Refresh Devices", "Refresh ADB device list", AllIcons.Actions.Refresh
     ) {
         override fun actionPerformed(e: AnActionEvent) {
-            refreshDevices()
-            taskRows.forEach { it.updateDevices(deviceResult) }
-            updateDeviceHealth(deviceResult)
+            refreshDevicesAsync()
         }
     }
 
