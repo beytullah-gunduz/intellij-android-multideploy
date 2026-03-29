@@ -129,7 +129,7 @@ class DeployRunner(private val project: Project) {
         val console = TextConsoleBuilderFactory.getInstance()
             .createBuilder(project).console
         console.print(output, ConsoleViewContentType.LOG_ERROR_OUTPUT)
-        val label = "${task.module} \u2192 ${shortenDevice(task.device)} [FAILED]"
+        val label = "${task.module} \u2192 ${task.deviceDisplayName} [FAILED]"
         val content = ContentFactory.getInstance()
             .createContent(console.component, label, false)
         content.isCloseable = true
@@ -138,7 +138,7 @@ class DeployRunner(private val project: Project) {
     }
 
     private fun notifyTaskResult(task: DeployTask, isError: Boolean) {
-        val label = "${task.module} \u2192 ${shortenDevice(task.device)}"
+        val label = "${task.module} \u2192 ${task.deviceDisplayName}"
         val (title, type) = if (isError) {
             "Deploy failed: $label" to NotificationType.ERROR
         } else {
@@ -148,9 +148,5 @@ class DeployRunner(private val project: Project) {
             .getNotificationGroup("Android MultiDeploy")
             .createNotification(title, type)
             .notify(project)
-    }
-
-    private fun shortenDevice(device: String): String {
-        return if (device.length > 12) ".." + device.takeLast(10) else device
     }
 }

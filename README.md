@@ -4,6 +4,8 @@ An IntelliJ / Android Studio plugin that deploys **multiple modules to multiple 
 
 Built for multi-device Android development — Wear OS companion apps, automotive + phone combos, multi-form-factor testing — but works for any workflow where you need to push different Gradle targets to different devices simultaneously.
 
+![Android MultiDeploy screenshot](screenshots/overview.png)
+
 ## The problem
 
 Android Studio only lets you deploy one module to one device at a time. If you're building a phone app and a Wear OS app together, you have to switch run configurations, select the right device, hit run, then do it again for the other module. Every. Single. Time.
